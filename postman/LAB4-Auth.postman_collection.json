@@ -1,0 +1,284 @@
+{
+  "info": {
+    "_postman_id": "182ada4b-e26f-4b69-a4c6-f5ec830a96d5",
+    "name": "LAB4 - Authentification JWT et rôles",
+    "description": "Parcours guidé : inscription USER, connexion USER/ADMIN, accès avec Bearer JWT et vérification des rôles.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "userName", "value": "student-demo" },
+    { "key": "userEmail", "value": "student@example.test" },
+    { "key": "userPassword", "value": "" },
+    { "key": "adminUsername", "value": "lab-admin" },
+    { "key": "adminPassword", "value": "" },
+    { "key": "userToken", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "categoryId", "value": "" },
+    { "key": "productId", "value": "" },
+    { "key": "orderId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Créer un compte USER",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{userName}}\",\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": { "raw": "{{baseUrl}}/api/auth/register" }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": { "type": "text/javascript", "exec": [
+            "const suffix = Date.now().toString();",
+            "pm.collectionVariables.set(\"userName\", \"student-\" + suffix);",
+            "pm.collectionVariables.set(\"userEmail\", \"student-\" + suffix + \"@example.test\");"
+          ]}
+        },
+        {
+          "listen": "test",
+          "script": { "type": "text/javascript", "exec": [
+            "pm.test(\"Inscription réussie : HTTP 201\", function () { pm.response.to.have.status(201); });",
+            "const account = pm.response.json();",
+            "pm.test(\"L'inscription publique crée seulement un rôle USER\", function () { pm.expect(account.role).to.eql(\"USER\"); });",
+            "pm.test(\"Le mot de passe n'est jamais renvoyé\", function () { pm.expect(account).not.to.have.property(\"password\"); });"
+          ]}
+        }
+      ]
+    },
+    {
+      "name": "2. Connexion USER et récupération du JWT",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{userName}}\",\n  \"password\": \"{{userPassword}}\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": { "raw": "{{baseUrl}}/api/auth/login" }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test(\"Connexion USER : HTTP 200\", function () { pm.response.to.have.status(200); });",
+        "const auth = pm.response.json();",
+        "pm.test(\"La réponse contient un jeton Bearer\", function () { pm.expect(auth.token).to.be.a(\"string\").and.not.empty; pm.expect(auth.tokenType).to.eql(\"Bearer\"); });",
+        "pm.collectionVariables.set(\"userToken\", auth.token);"
+      ]}}]
+    },
+    {
+      "name": "3. Connexion ADMIN et récupération du JWT",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{adminUsername}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": { "raw": "{{baseUrl}}/api/auth/login" }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test(\"Connexion ADMIN : HTTP 200\", function () { pm.response.to.have.status(200); });",
+        "const auth = pm.response.json();",
+        "pm.collectionVariables.set(\"adminToken\", auth.token);"
+      ]}}]
+    },
+    {
+      "name": "4. Refuser les produits sans jeton",
+      "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/products" } },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test(\"Sans jeton : HTTP 401\", function () { pm.response.to.have.status(401); });"
+      ]}}]
+    },
+    {
+      "name": "5. Créer une catégorie (ADMIN)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"Catégorie sécurité {{userName}}\"\n}", "options": { "raw": { "language": "json" } } },
+        "url": { "raw": "{{baseUrl}}/api/categories" }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test(\"ADMIN crée une catégorie : HTTP 201\", function () { pm.response.to.have.status(201); });",
+        "pm.collectionVariables.set(\"categoryId\", pm.response.json().id);"
+      ]}}]
+    },
+    {
+      "name": "6. Créer un produit (ADMIN)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Produit sécurité {{userName}}\",\n  \"price\": 25.50,\n  \"categoryId\": {{categoryId}}\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": { "raw": "{{baseUrl}}/api/products" }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test(\"ADMIN crée un produit : HTTP 201\", function () { pm.response.to.have.status(201); });",
+        "pm.collectionVariables.set(\"productId\", pm.response.json().id);"
+      ]}}]
+    },
+    {
+      "name": "7. ADMIN modifie une catégorie",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"Catégorie modifiée {{userName}}\"\n}", "options": { "raw": { "language": "json" } } },
+        "url": { "raw": "{{baseUrl}}/api/categories/{{categoryId}}" }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test(\"ADMIN modifie une catégorie : HTTP 200\", function () { pm.response.to.have.status(200); });"
+      ]}}]
+    },
+    {
+      "name": "8. USER ne peut pas modifier une catégorie",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{userToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"Modification refusée\"\n}", "options": { "raw": { "language": "json" } } },
+        "url": { "raw": "{{baseUrl}}/api/categories/{{categoryId}}" }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test(\"USER ne modifie pas une catégorie : HTTP 403\", function () { pm.response.to.have.status(403); });"
+      ]}}]
+    },
+    {
+      "name": "9. USER peut consulter les produits",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }],
+        "url": { "raw": "{{baseUrl}}/api/products" }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test(\"USER lit les produits : HTTP 200\", function () { pm.response.to.have.status(200); });"
+      ]}}]
+    },
+    {
+      "name": "10. USER ne peut pas créer un produit",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{userToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Produit refusé {{userName}}\",\n  \"price\": 9.99,\n  \"categoryId\": {{categoryId}}\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": { "raw": "{{baseUrl}}/api/products" }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test(\"USER sans privilège : HTTP 403\", function () { pm.response.to.have.status(403); });"
+      ]}}]
+    },
+    {
+      "name": "11. USER crée une commande",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{userToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": [\n    { \"productId\": {{productId}}, \"quantity\": 2 }\n  ]\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": { "raw": "{{baseUrl}}/api/orders" }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test(\"USER crée sa commande : HTTP 201\", function () { pm.response.to.have.status(201); });",
+        "const order = pm.response.json();",
+        "pm.collectionVariables.set(\"orderId\", order.id);",
+        "pm.test(\"Le total correspond aux articles\", function () { pm.expect(order.total).to.eql(51); });"
+      ]}}]
+    },
+    {
+      "name": "12. USER voit ses commandes",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }],
+        "url": { "raw": "{{baseUrl}}/api/orders" }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test(\"Liste des commandes USER : HTTP 200\", function () { pm.response.to.have.status(200); });",
+        "pm.test(\"La commande créée apparaît dans sa liste\", function () { pm.expect(pm.response.json().some(order => order.id.toString() === pm.collectionVariables.get(\"orderId\").toString())).to.eql(true); });"
+      ]}}]
+    },
+    {
+      "name": "13. ADMIN voit toutes les commandes",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+        "url": { "raw": "{{baseUrl}}/api/orders" }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test(\"ADMIN voit les commandes : HTTP 200\", function () { pm.response.to.have.status(200); });"
+      ]}}]
+    },
+    {
+      "name": "14. USER ne peut pas supprimer une commande",
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }],
+        "url": { "raw": "{{baseUrl}}/api/orders/{{orderId}}" }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test(\"Suppression réservée à ADMIN : HTTP 403\", function () { pm.response.to.have.status(403); });"
+      ]}}]
+    },
+    {
+      "name": "15. ADMIN supprime une commande",
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+        "url": { "raw": "{{baseUrl}}/api/orders/{{orderId}}" }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test(\"ADMIN supprime la commande : HTTP 204\", function () { pm.response.to.have.status(204); });"
+      ]}}]
+    },
+    {
+      "name": "16. ADMIN ne supprime pas une catégorie non vide",
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+        "url": { "raw": "{{baseUrl}}/api/categories/{{categoryId}}" }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test(\"Catégorie contenant un produit protégée : HTTP 409\", function () { pm.response.to.have.status(409); });"
+      ]}}]
+    },
+    {
+      "name": "17. Refuser un JWT invalide",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer token-invalide-pour-le-test" }],
+        "url": { "raw": "{{baseUrl}}/api/products" }
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test(\"JWT invalide : HTTP 401\", function () { pm.response.to.have.status(401); });"
+      ]}}]
+    }
+  ]
+}
