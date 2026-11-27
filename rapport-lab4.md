@@ -23,21 +23,22 @@ La clé JWT et les paramètres du compte administrateur initial sont fournis par
 
 La commande `mvn clean verify` a été exécutée avec Java 21. Les **5 tests d'intégration H2 ont réussi**, sans échec ni erreur. Les tests couvrent notamment l'inscription, le hachage BCrypt, la connexion, les jetons invalides, les réponses `401` et `403`, les rôles et la confidentialité des commandes.
 
-La configuration Docker Compose a été analysée avec `docker compose config`. Le moteur Docker n'était pas démarré lors de la révision ; par conséquent, le fonctionnement de l'application contre un serveur MySQL local n'a pas été vérifié durant cette session. Les secrets doivent rester masqués dans les captures et ne jamais être publiés.
+La configuration Docker Compose a été analysée avec `docker compose config`. Une démonstration ultérieure a utilisé une instance MySQL locale distincte de Docker. L'inscription d'un compte `USER` a réussi et une requête sans jeton a été refusée. Les secrets doivent rester masqués dans les captures et ne jamais être publiés.
 
 ## 4. Conclusion
 
 Le projet met en œuvre une API stateless protégée par JWT et des autorisations fondées sur les rôles. Le contrôle des commandes tient compte du propriétaire de la ressource et ne repose pas uniquement sur la connaissance de son identifiant.
 
-## 5. Captures à joindre
+## 5. Captures des exécutions
 
-Les captures doivent être prises après exécution réelle sur l'ordinateur utilisé pour la démonstration. Masquer les mots de passe, les jetons et la clé JWT :
+**Inscription d'un utilisateur dans Postman — HTTP 201 :**
 
-1. MySQL Docker ou local démarré.
-2. Terminal PowerShell montrant l'application Spring Boot démarrée, sans secrets.
-3. Postman affichant une inscription `USER` et une connexion réussie.
-4. Postman démontrant un accès refusé (`403`) pour une opération réservée à `ADMIN`.
-5. Postman affichant la création ou la consultation d'une commande par son propriétaire.
-6. Page GitHub du projet ou résultat du workflow GitHub Actions.
+![Inscription d'un utilisateur dans Postman](captures-rapport/05-postman-inscription.png)
 
-**Aucune capture d'écran n'est intégrée à ce rapport.**
+**Accès aux produits sans jeton — HTTP 401 :**
+
+![Requête sans authentification dans le terminal](captures-rapport/04-terminal-http.png)
+
+**Tests automatisés — `mvn test` :**
+
+![Résultat des tests Maven](captures-rapport/03-terminal-mvn-test.png)
